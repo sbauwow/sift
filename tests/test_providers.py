@@ -51,7 +51,7 @@ def test_provider_config_has_builtin_presets_for_supported_backends():
 def test_provider_config_has_anthropic_claude_preset():
     config = provider_config("anthropic", api_key="x")
 
-    assert config.model == "claude-sonnet-4-6"
+    assert config.model == "claude-opus-4-6"
     assert config.endpoint == "https://api.anthropic.com/v1/messages"
 
 
@@ -63,7 +63,7 @@ def test_anthropic_default_uses_claude_4_6_without_temperature():
         temperature=0.2,
     )
 
-    assert request.json["model"] == "claude-sonnet-4-6"
+    assert request.json["model"] == "claude-opus-4-6"
     assert "temperature" not in request.json
 
 
@@ -83,7 +83,7 @@ def test_anthropic_provider_prepares_messages_request():
     assert request.headers["anthropic-version"] == "2023-06-01"
     assert "Authorization" not in request.headers
     assert request.json == {
-        "model": "claude-sonnet-4-6",
+        "model": "claude-opus-4-6",
         "max_tokens": 4096,
         "system": "Be terse.",
         "messages": [{"role": "user", "content": "write a regex for hex colors"}],
@@ -168,7 +168,7 @@ def test_anthropic_provider_parses_usage_with_pricing_table():
 
     response = provider.generate([ChatMessage(role="user", content="regex?")])
 
-    pricing = model_pricing("claude-sonnet-4-6")
+    pricing = model_pricing("claude-opus-4-6")
     assert response.usage is not None
     assert response.usage.input_tokens == 1000
     assert response.usage.output_tokens == 2000

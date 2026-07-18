@@ -185,8 +185,8 @@ _DEFAULT_ENDPOINTS = {
 }
 
 _DEFAULT_MODELS = {
-    "anthropic": "claude-sonnet-4-6",
-    "claude": "claude-sonnet-4-6",
+    "anthropic": "claude-opus-4-6",
+    "claude": "claude-opus-4-6",
     "copilot": "gpt-5-mini",
     "deepseek": "deepseek-chat",
     "opencode": "qwen2.5-coder",
@@ -207,11 +207,11 @@ _MODEL_PRICING = {
         input_cost_per_million=0.25,
         output_cost_per_million=2.0,
     ),
-    "claude-sonnet-4-6": ModelPricing(
-        model="claude-sonnet-4-6",
+    "claude-opus-4-6": ModelPricing(
+        model="claude-opus-4-6",
         tier="frontier",
-        input_cost_per_million=3.0,
-        output_cost_per_million=15.0,
+        input_cost_per_million=5.0,
+        output_cost_per_million=25.0,
     ),
 }
 

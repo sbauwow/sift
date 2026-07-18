@@ -1,6 +1,6 @@
 # sift
 
-**A model router that gets smarter every run.** A small local triage LLM reads each request, routes it to the cheapest Claude tier that will clear the quality bar, records what happened, and compounds those outcomes into a persistent memory — so cost, retries, and latency fall run over run without retraining anything. Every hop is instrumented with HiddenLayer runtime security, which drives a **second** learning loop — a risk model that gets better at pre-empting attacks over runs.
+**A model router that gets smarter every run — running as a heartbeat-driven Claw Agent.** A small local triage LLM reads each request, routes it to the cheapest tier that will clear the quality bar, records what happened, and compounds those outcomes into a persistent memory — so cost, retries, and latency fall run over run without retraining anything. It runs as a proactively autonomous daemon: on a heartbeat it wakes, checks its task list, and *proactively explores* to sharpen its own policy even with no user traffic. Every hop is instrumented with HiddenLayer runtime security, which drives a **second** learning loop — a risk model that gets better at pre-empting attacks over runs.
 
 Built for the **AITX Community × NVIDIA "Claw Agent" Hackathon** — targeting the **Recursive Intelligence** and **HiddenLayer Runtime Security** tracks.
 
@@ -36,6 +36,64 @@ A router is a **chokepoint** — every input, output, tool call, and tool result
 - **Use of detections — a *second* learning loop, not the cost router.** Injection risk is orthogonal to model tier (a poisoned doc is poisoned whether it goes to Haiku or Fable), so findings do **not** feed the cost policy. Instead they train a **separate risk model** — `(source / pattern / feature → attack-likelihood)`. What recurses: sift learns which input sources and tool-results tend to carry attacks and **pre-emptively routes them through the hardened path** (sanitization, stricter instruction hierarchy, quarantine sub-agent, human escalation) *before* content reaches the primary model — because it learned that source is risky from past detections.
   - **The learned part** is the risk prediction (which requests get hardened pre-emptively); the flag→hardened-route mapping itself is a fixed rule (we don't dress it up as learned).
   - **Its own delta curve:** *fraction of injected payloads that reach the primary model* (or mean detection latency, or human-escalations-needed) trends **down** over runs. Run 1, a novel poisoned source reaches the model and HiddenLayer catches it at egress; run 8, sift already quarantines that source class at ingress. So the second track isn't a passive screen — it's a second recursive-intelligence loop with its own measurable improvement.
+
+## sift is a Claw Agent (heartbeat-driven, not prompt-driven)
+
+The hackathon's bar: a Claw Agent is **proactively autonomous**, **heartbeat-driven** (a loop that wakes on a timer/state, checks its task list, acts or waits — the trigger is *time*, not a human message), and **persistent with context** (its own workspace, memory, files, session history). sift qualifies natively — and the heartbeat is where its hardest design problem gets solved.
+
+**The heartbeat loop.** sift runs as a daemon. Each wake:
+
+1. **Drain pending routing requests** (react to any queued work).
+2. **Process queued human labels + HiddenLayer escalations** into the policy and risk model.
+3. **Proactive exploration cycle (budget-capped).** Pick the highest-uncertainty feature region / most-censored difficulty-threshold cell, run a probe task through the candidate rung, grade with the oracle, update the policy. **This is the answer to every "who pays for exploration?" grill** — exploration runs on the heartbeat, off the user's critical path, on an idle-time budget, so by the time real traffic arrives the policy is *already sharp*. sift initiates its own experiments.
+4. **Monitor conditions.** Check for model/price/availability changes and provider health; schedule recalibration if a rung's behavior drifted (a model update silently changes pass rates — the agent catches it).
+5. **Housekeeping.** Re-warm the prefix cache before it expires; run a periodic drift-detection benchmark; checkpoint state.
+6. **Sleep** until the next heartbeat.
+
+**Proactively autonomous:** it initiates work (exploration probes), monitors conditions (drift/price/health), schedules subtasks (recalibration, re-warms), recovers from interruptions (resumes an in-flight fail-up climb or re-drives an interrupted probe), and coordinates multi-step workflows (the fail-up climb is one). **Persistent with context:** the SQLite policy/observation store, task-solution cache, risk model, and calibration *are* its workspace and session history, surviving restarts.
+
+**Why this makes the whole design stronger, not just compliant:** sift can improve its calibrated policy **between user requests** by running budget-capped probes against the benchmark/task distribution. "Recursive intelligence that gets sharper the more it runs" becomes literal without putting exploration on the user's critical path. The demo can show the policy tightening between runs while no one is typing.
+
+## Scale (the vision): llm-d turns the local tier into a company-wide idle-GPU pool
+
+sift's local tier doesn't have to be one GPU. With **llm-d** — the Red Hat-led, Kubernetes-native distributed vLLM stack (prefix-cache-aware routing, KV-cache-aware load balancing, disaggregated prefill/decode across many vLLM instances) — the local tier becomes **every idle GPU across the company, federated into one pool.** Underused workstations, gaming rigs, idle servers all join; sift routes to the free internal fleet first and pays cloud only for what the fleet can't clear.
+
+**Two routers, different jobs, clean composition:**
+
+- **sift routes across the *cost/capability* ladder** — "can the free internal fleet handle this, or escalate to paid Claude?"
+- **llm-d routes *within* the local-fleet tier across physical idle GPUs** — "which idle box serves this, and which one already has the prefix cached?"
+
+They don't overlap: sift is the cost/capability router, llm-d is the fleet inference router. The `local-served%` curve becomes **fleet utilization**; the heartbeat monitors *which machines are idle right now* and routes fleet-aware (proactive condition-monitoring — the Claw definition); and the fleet's real, time-varying capacity is another non-pretrainable thing sift's recursive loop learns.
+
+**Why it matters commercially:** "pool your company's idle GPUs and route LLM traffic to them before touching a paid API" is a real, growing product — orgs sit on huge idle GPU capacity while paying enormous cloud-LLM bills. That's the **Antler "Most Commercializable"** pitch.
+
+**Integration is interface-light, not deployment-free** — llm-d exposes an OpenAI-compatible gateway, and the provider layer already has an `llmd` preset. sift routing to llm-d instead of a single vLLM should be mostly a config change at the router layer; Kubernetes/fleet deployment complexity is explicitly outside the MVP.
+
+> **Scope boundary (freeze is Sunday 11 AM):** llm-d ships as the **local-tier serving endpoint** (a real integration if run even single-node or 2-node); the full company-wide fleet is the **commercialization narrative + architecture**, not a from-scratch Kubernetes buildout in the timebox. It sits *above* the MVP core, never in its critical path.
+
+## Sponsor technology is load-bearing
+
+The sponsor integrations are not stickers; each one supports the measured router/security story and the judging's **Use of Sponsor Technology (30 pts)**:
+
+- **Best Use of vLLM ($500).** sift is almost custom-built for this bounty's rubric: *small-model punch* (route to a small open model when it suffices — the entire thesis), *efficiency* (continuous batching / PagedAttention / concurrent inference), and *real integration under a heartbeat* (repeated/concurrent inference where throughput matters). vLLM isn't a mention — it's the engine.
+- **Best Use of Nemotron ($100/member).** The local answerer + triage + embeddings + judge run **NVIDIA Nemotron** via NIM/vLLM — central to what the agent does, not a wrapper.
+- **Best Use of NemoClaw + OpenShell ($100/member).** sift's executable oracle **runs untrusted model-generated code to grade it** — the perfect thing to contain. We run the oracle (and the agent) inside an **OpenShell sandbox** with a declarative YAML policy: no network exfil, no protected-path access, no un-approved endpoints. The agent has real access (runs code, hits provider APIs, writes its memory store) but is policy-blocked from crossing lines. **This pairs with HiddenLayer as defense-in-depth: HiddenLayer *detects* the injection, OpenShell *contains* the blast radius** — a coherent two-sponsor security story judges can test under pressure.
+- **Supabase ($25 credits).** MVP persistence is SQLite for speed and local reliability; Supabase Postgres is the sponsor-aligned persistence target if time permits, backing the same policy/observation/memory schema.
+- **Most Commercializable (Antler).** "Pool your company's idle GPUs (via llm-d) and route LLM traffic to them before touching a paid API" — see [Scale](#scale-the-vision-llm-d-turns-the-local-tier-into-a-company-wide-idle-gpu-pool). A real, growing market (idle GPU capacity vs. huge cloud-LLM bills), not a hackathon toy.
+
+## MVP scope — what ships by the 11:00 AM Sunday freeze
+
+**The thesis is fixed; scope discipline now outranks ambition** (15 pts, "runs without crashing," explicitly "not slide decks"). Ruthless cut — build the thin end-to-end slice that hits the core tracks, then add sponsor depth only if time remains.
+
+**Ship (the working core):**
+1. **vLLM serving Nemotron** locally (OpenAI-compatible endpoint) — provider layer already speaks this.
+2. **Harness + executable oracle** (already built) running a task suite, **inside an OpenShell YAML sandbox**.
+3. **Minimal learning router** — two rungs (local-Nemotron vs. one Claude tier), a per-region **difficulty-threshold** estimate updated from oracle outcomes. Show **cost ↓ / local-served% ↑ over repeated runs** — the Recursive delta.
+4. **HiddenLayer** wrapping prompt/response/tool-call I/O — the track.
+5. **Heartbeat daemon** — a timer loop that runs the suite / a proactive probe each wake (Claw requirement) + persists locally, with Supabase as a stretch target.
+6. **A simple live readout** of the delta curve (doesn't need to be pretty — needs to run).
+
+**Defer past the freeze (all the grill-hardened depth):** hidden-state features (use a simpler feature vector for the MVP), the full quant-tier ladder (one precision), Thompson bandit + monotone ordinal regression (simple threshold estimate), speculative decoding, and cold-ablation-vs-warm-shift staging. **Do not defer the serious baselines:** MVP must compare at least always-local, always-Claude-default, and static tag-routing; the full five-rung Pareto plot is stretch. These are what make it *win*, but not what makes it *run* — and a running system scores, a plan doesn't.
 
 ## How it's judged, and how we score it
 
@@ -104,6 +162,8 @@ This is an NVIDIA hackathon, and a pure cloud router would *minimize* local comp
 - **The recursive story is pro-local:** sift *learns where the local model's competence boundary is* and pushes **more** traffic onto the GPU over runs. **Local-served fraction trends up** run over run — the GPU takes over more of the workload as the agent gets smarter, and cloud spend falls. That's the third curve.
 - **Falsification test passes:** pull the GPU and the demo breaks — triage/embeddings/judge stall, the free tier collapses, cost spikes as everything is forced to paid Claude. The GPU is load-bearing, not a sticker.
 
+**"But the ladder is generic — doesn't that make the GPU optional?"** For the NVIDIA-track configuration, no — because the GPU plays *two* roles and only one is a routing tier. (1) The local model as an **answerer tier** is optional in the general product; a user can configure a cloud-only ladder and skip it. (2) In the demo, the local GPU is deliberately the **router's engine**: hidden-state feature extraction, routing-memory embeddings, the LLM-judge, risk-model inference, and local answer serving run on the GPU. "Load-bearing" means the demo engine; "optional/generic" means the deployable answerer ladder.
+
 ## Architecture
 
 ```
@@ -153,36 +213,75 @@ request
 
 **Principle: triage proposes, policy disposes.** The local LLM gives a soft recommendation; deterministic code enforces hard constraints (context-window fit, budget cap, provider health, security override). The classifier never makes an unbounded-cost or unsafe decision alone.
 
-## Routing targets (current Claude lineup)
+## Routing targets — a ladder with a *local quant sub-ladder*
 
-| Tier | Model | $/1M in/out | Context | Route here for |
-|---|---|---|---|---|
-| **Local (NVIDIA)** | **local code model (e.g. Qwen-Coder), TensorRT-LLM** | **~$0 (GPU)** | model-dep | **trivial jobs served end-to-end: rename, regex, docstring, explain-error** |
-| Cheap/fast | `claude-haiku-4-5` | $1 / $5 | 200K | classification, simple extraction, latency-critical |
-| Balanced | `claude-sonnet-5` | $3 / $15 (intro $2/$10 thru 2026-08-31) | 1M | high-volume, most coding, general |
-| Hard | `claude-opus-4-8` | $5 / $25 | 1M | agentic, long-horizon, hard reasoning |
-| Frontier | `claude-fable-5` | $10 / $50 | 1M | the hardest long-horizon work only |
+The tier ladder doesn't start at Haiku — it starts with **the same local model served at three precisions on the NVIDIA GPU.** The "cheapest sufficient tier" thesis extends *into* the local domain: the policy learns, per feature region, not just local-vs-Claude but *which local precision* suffices.
 
-**The local NVIDIA model is a first-class routing tier, not just the triage step** — it produces final answers (graded by the same oracle) for the easy slice, and also runs the triage classifier, the routing-memory embeddings, the LLM-judge, and the risk-model inference. Every request touches the GPU 2–4×; a real fraction is served entirely on it. See [Does the GPU earn its place?](#does-the-gpu-earn-its-place).
+| Tier | Model | $/1M in/out | Route here for |
+|---|---|---|---|
+| **Local · INT4/AWQ** | **NVIDIA Nemotron, 4-bit (vLLM Marlin/AWQ)** | **~$0, fastest** | **the truly trivial: rename, regex, docstring, one-liner** |
+| **Local · FP8** | **same model, FP8 (Hopper/Ada tensor cores)** | **~$0, fast** | **easy-but-not-trivial local jobs where INT4 fails the oracle** |
+| **Local · BF16** | **same model, full precision** | **~$0, slower** | **the hardest thing the local model can still pass** |
+| Cheap/fast | `claude-haiku-4-5` | $1 / $5 | classification, simple extraction, latency-critical |
+| Balanced | `claude-sonnet-5` | $3 / $15 (intro $2/$10 thru 2026-08-31) | high-volume, most coding, general |
+| Default Claude / hard | `claude-opus-4-6` | $5 / $25 | agentic, long-horizon, hard reasoning |
+| Frontier | `claude-fable-5` | $10 / $50 | the hardest long-horizon work only |
 
-## The triage decision
+The table above is the **demo ladder**, not a hardcoded assumption — the ladder is **whatever cost/capability-ordered model stack the user configures** (the provider layer already speaks OpenAI-compatible + Anthropic + local backends). Everything below — entry-hop, fail-up, the policy — is ladder-agnostic; swap in a different stack and it still works.
 
-The local LLM emits a structured verdict (JSON-schema-constrained), not prose:
+**On the quant rungs — a measured hypothesis, not a settled 3-tier ladder.** The honest axis is **speed at equal quality, not a quality gradient.** Modern quantization is near-lossless (FP8 within ~1–2% of BF16, good INT4 close behind), so the "fails-INT4 / passes-FP8" band may be thin — possibly below the oracle's noise. That's *fine*, because the routing rule is "the **fastest/cheapest precision that still passes the oracle**": if INT4 passes as often as FP8, the win is pure latency, and everything routes to INT4. **Phase 2 measures the per-precision pass rates and *that* decides the rung count** — keep INT4+FP8 if the INT4-miss band is real; collapse to a single FP8 local tier (and say so) if it's trivial. FP8 on Hopper/Ada is a literal tensor-core showcase for the NVIDIA track regardless. VRAM: a 7B at INT4 (~4GB) + FP8 (~7GB) both fit alongside the KV cache on a 24GB card; tighter on smaller cards, another reason to let the measurement decide.
 
-```json
-{
-  "complexity": "high",
-  "domain": "code",
-  "est_input_tokens": 45000,
-  "latency_sensitive": false,
-  "needs_tools": true,
-  "recommended_tier": "opus",
-  "confidence": 0.82,
-  "reasoning": "multi-file refactor, agentic"
-}
-```
+**The local model is a first-class set of routing tiers, not just the triage step** — it produces final answers (graded by the same oracle) for the easy slice at whichever precision suffices, and also runs the triage prefill, routing-memory embeddings, the LLM-judge, and the risk-model inference. Every request touches the GPU multiple times. See [Does the GPU earn its place?](#does-the-gpu-earn-its-place).
 
-The policy engine merges this with routing memory (has a similar request been seen? what won?), hard constraints, and any HiddenLayer override.
+## The triage decision — powered by the vLLM engine
+
+The routing brain does **not** ask the local model to *generate* a hand-designed JSON verdict. It uses three advanced vLLM capabilities so the GPU is load-bearing on every request and the "policy over features" claim is real, not asserted. (One-shot tasks now; interfaces kept agentic-ready — local tool-calling is a later bolt-on, see [Deferred](#deferred).)
+
+### 1. Hidden-state features (the router's real input)
+
+A **prefill-only** pass through the local model (vLLM pooling/embedding path — `--task embed` / `PoolingParams`) yields the pooled last-layer **hidden state**. *That vector is the routing feature.* The parametric policy (logistic / LinUCB) is fitted over this learned embedding instead of over five hand-picked dims like `complexity/domain/tokens`.
+
+- **Faster:** prefill only — no autoregressive decode to produce a verdict.
+- **Better generalization:** a learned representation is richer than any hand-designed feature set, and it removes the grill-vulnerable "did you pick the right 5 features?" question — this is how research-grade LLM routers actually work.
+- **Load-bearing GPU:** *every* request hits the GPU for this prefill, independent of who answers it.
+
+### 2. Confidence-gated local serving (draft-and-check)
+
+The local model *drafts* an answer with `logprobs` enabled; its **token entropy / mean-logprob is a self-confidence signal.** Confident → serve the draft locally (**local-served% ↑** — the NVIDIA curve); uncertain → escalate up the ladder, optionally passing the draft as context.
+
+**Never trust the raw logprob — learn its calibration.** LLM confidence is overconfident, worst on confident-*wrong* answers, so raw gating would serve confidently-broken output. sift uses confidence as a *feature* whose relationship to actual oracle-pass is **learned** (`P(pass | confidence, features)`) — where the local model is systematically overconfident in some region, the fitted map discounts it. This is the same miscalibration-correction that's the router's core. And aggression is **gated on oracle availability**: where an executable oracle exists, a confident-wrong draft is caught in ~one cheap call (bounded failure, never "ship it"), so confidence-gating is bold there and conservative where verification is weak. *(Naming note: this is confidence-gated **routing** — distinct from vLLM speculative **decoding** in §4, which is an unrelated engine-level speedup. Don't conflate the two "speculative"s.)*
+
+### 3. Guided decoding (reliability + a free pass-rate lift)
+
+vLLM guided decoding (xgrammar/outlines; `guided_json` / `response_format: json_schema` / `guided_grammar`) constrains every structured output — any residual triage metadata, the LLM-judge's grading verdict, and post-mortem writes — to a schema, so nothing in the loop needs retry-on-bad-JSON. **The clever use:** constrain the *local tier's answer* to the task's expected shape. A 7B model often fails the executable oracle only via format noise (fences, prose, wrong shape); grammar-constraining its output raises its pass rate **at zero extra cost**, which directly pushes **local-served% up and cost down** — the two headline curves. Bonus: a grammar the model *cannot* escape is a structural injection guardrail (feeds the HiddenLayer narrative).
+
+### 4. Engine throughput — the plumbing that makes "GPU on every request" cheap
+
+The three capabilities above run the GPU on *every* request; these keep that affordable and feed the demo:
+
+- **Quant-tier serving (§ routing ladder).** INT4/AWQ (Marlin kernels) + FP8 (Hopper/Ada tensor cores) instances of the local model as distinct routing rungs — fits more model per GPU and lets the policy route to the cheapest precision that clears the oracle.
+- **Automatic prefix caching** (`--enable-prefix-caching`). The triage prefill runs over a shared preamble on *every* request, and RAG task-memory prepends retrieved context — prefix caching reuses that KV across requests, so the per-request GPU work you added is largely a cache hit, not a recompute.
+- **Speculative decoding** (draft model / n-gram / EAGLE) on the local answerer — speeds the draft-and-check path in §2, lowering serve-local latency so a bigger fraction of traffic stays local without a latency penalty. *(This is the real vLLM feature named "speculative"; §2's confidence gating is the routing metaphor — kept separate on purpose.)*
+- **Prometheus metrics** (`/metrics`). vLLM exposes throughput, GPU utilization, TTFT, tokens/s, and **prefix-cache hit rate** — piped straight into the dashboard's GPU-telemetry strip, so the "NVIDIA money shot" panel is a free feed, not hand-built instrumentation.
+
+The policy engine then merges the hidden-state policy score + the local draft's confidence with routing memory, hard constraints, and any HiddenLayer override.
+
+## Climbing the ladder — expected-cost entry + generic fail-up
+
+The routing decision is **not** "start at the bottom and climb every rung." That would be strictly worse than always-Opus on a hard task (you'd pay local+Haiku+Sonnet+Opus at 4× latency vs. one Opus call). It's an **expected-cost-minimizing entry hop** followed by **oracle-gated fail-up** — and a separate mode for latency-sensitive traffic.
+
+**Why the embedding alone can't pick the tier.** The hidden-state feature comes from the local model, and a small model *cannot represent difficulty beyond its own horizon* — a frontier-hard task and a merely-hard task both encode as "beyond me." So the embedding is sharp at the **local-vs-escalate boundary** but flat near the **top**, exactly where a wrong call costs the most.
+
+**The fix — enter at the cost-minimizer, not the bottom:**
+
+1. **Entry = argmin expected total cost.** Given `P(pass | rung, features)`, pick the entry rung that minimizes `E[cost] = Σ (cost of rungs r..top, weighted by the chance each is reached)`. For a task the router reads as hard/uncertain, entering low has *high* expected fail-up cost, so the minimizer **enters high directly** (Sonnet/Opus) — skipping cheap rungs that would just fail. The embedding doesn't need to rank Opus-vs-Fable; its "escalate, and I'm unsure how far" reading is what pushes entry high under uncertainty. **Hard tasks don't climb the whole ladder — they start near the top.**
+2. **Fail-up corrects *misjudged-easy* tasks only.** On an oracle failure, escalate one rung up the configured ladder and retry. This is rare (it only fires when an easy-*looking* task is actually hard), bounded, and the cost counter includes every failed rung. always-Opus, by contrast, overpays Opus on the whole easy majority — that's sift's Pareto win; the hard tail roughly ties, the climb is the exception.
+3. **Latency-sensitive traffic never fails up.** Sequential climb is disqualifying for interactive requests, so those are a hard constraint: **commit to the single expected-pass tier** (accept the occasional miss) or **race rungs in parallel** (fire local + a cloud tier concurrently, take the first that passes — trade cost for latency). Sequential fail-up is for latency-*tolerant* traffic only.
+4. **Ladder-agnostic.** "Next rung up" is the user's cost/capability ordering — local-quant → Haiku → Sonnet → Opus → Fable in the demo, or any stack (DeepSeek, Qwen, GPT-via-OpenAI-compat, a second local model). The climb is over an ordered `Ladder` from config; nothing is hardcoded to Claude.
+
+**Learning the entry rung is a *scalar*, not a 6-way matrix.** Pass-probability up a capability-ordered ladder is (approximately) **monotone** — if Sonnet passes, Opus/Fable pass; if Haiku fails, local fails. So the policy learns **one difficulty threshold per feature region** (the lowest passing rung), a low-dim ordinal regression, comfortably learnable from ~300 points. Monotonicity also **un-censors for free**: one rung result labels every rung above (pass) or below (fail) it, and each observation is an interval-censored inequality on the threshold — a standard survival/ordinal estimator, not empty data. Exploration to un-censor uses the same Thompson-driven, one-rung-down, oracle-caught discipline. (Monotonicity is approximate — modeled as monotone-with-noise; warm-start is stack-specific — a user brings their own ladder and warm-starts on it once.)
+
+Over runs the policy sharpens the threshold, so entries land right the first time and fail-up approaches zero — the recursive delta, now covering the whole ladder.
 
 ## The demo (this wins or loses the room)
 
@@ -208,19 +307,29 @@ The narrative: *dumb and expensive on run 1, sharp and cheap by the end; it beat
 | Phase | Deliverable | Why it matters |
 |---|---|---|
 | 0 | `Provider` interface + backends: **local NVIDIA model (serves answers, not just triage)** + one Claude tier, hardcoded routing | Proves the abstraction + makes the GPU a real routing target from day one |
-| 1 | Triage LLM on local/NVIDIA (TensorRT-LLM) + embeddings + judge + risk-model all GPU-served; policy engine (budget/context/health guards) | The routing brain; makes the GPU load-bearing across every request |
+| 1 | Local vLLM engine on NVIDIA: **hidden-state prefill** for features, **logprob-drafting** for confidence, **guided decoding** for triage/judge/answers, **quant-tier serving** (INT4/AWQ + FP8 rungs), **prefix caching**, **speculative decoding** for the local path; embeddings + judge + risk-model all GPU-served; policy engine (budget/context/health guards) | The routing brain; makes the GPU load-bearing *and* cheap on every request |
 | 2 | Task suite (defensible dev-help archetypes, measured difficulty spread) with **executable-check oracle**; cold→warm harness (incl. **held-out set**); **all-five one-liner baselines + Pareto plot** | The judged number, the "not a cache" proof, and the "beats a one-liner" existence test — build first, everything is measured against it |
-| 3 | Parametric routing policy (features → per-tier pass-prob) + Thompson-sampling bandit + triage-calibration correction + **offline warm-start on a large corpus** + telemetry (cost incl. retries + grading, latency, outcome per run) | The recursive core — this is the track |
+| 3 | Routing policy: **monotone difficulty-threshold** over the hidden-state embedding (interval-censored ordinal regression) + expected-cost entry + fail-up/parallel/commit modes + Thompson bandit + logprob-confidence *calibration* + **offline warm-start** + telemetry (cost incl. every failed rung, latency, outcome per run) | The recursive core — this is the track; threshold framing makes it learnable from ~300 samples |
+| 3.5 | **Heartbeat daemon (Claw Agent)** — wake loop: drain requests → ingest labels/escalations → **budget-capped proactive exploration** (probe highest-uncertainty threshold cells off the critical path) → monitor drift/price/health → re-warm cache + checkpoint → sleep. Persistent SQLite workspace survives restarts. | The hackathon's Claw-Agent bar *and* where the "who pays for exploration" answer lives — sift sharpens between user requests |
 | 4 | Task memory (RAG-from-self-context recall) + layered grader (executable → sampled LLM-judge → human queue) | Second learning mechanism + honest quality signal |
 | 5 | HiddenLayer instrumentation at ingress/egress + tool hops; findings → **separate risk model** (source → attack-likelihood) that pre-hardens/escalates; track *attacks-reaching-model* over runs; escalate → shared human queue | Second track = its own recursive loop, shares the human-in-the-loop surface |
-| 6 | Dashboard: delta curves, **Pareto plot vs 5 baselines**, held-out curve, **local-served % + GPU telemetry**, $ saved, live routing, human-grade beat, HiddenLayer feed | The demo |
+| 6 | Dashboard: delta curves, **Pareto plot vs baselines**, held-out curve, **local-served % by quant tier + GPU telemetry from vLLM `/metrics`** (util, tokens/s, prefix-cache hit rate), $ saved, live routing, human-grade beat, HiddenLayer feed | The demo |
 
 Front-load Phases 2, 3, and 6 — the measurable delta, the generalizing core, and the live visualization are the whole score. Phase 2 first: without the oracle, the baselines, and the held-out harness, no number you show is falsifiable.
 
 ## Stack
 
-- Core: Python (SDK: `anthropic`), structured triage outputs via JSON schema.
-- Local/NVIDIA serving (TensorRT-LLM / NIM): the local answerer tier (e.g. Qwen-Coder) **plus** triage classifier, routing-memory embeddings, LLM-judge, and risk-model inference — every request hits the GPU 2–4×.
+- Core: Python (SDK: `anthropic`), OpenAI-compatible provider interface (designed agentic-ready; tool-calling deferred).
+- **Local vLLM engine on NVIDIA** — the load-bearing GPU workhorse:
+  - **Hidden states** — prefill-only pooling (`--task embed` / `PoolingParams`) → the routing policy's feature vector.
+  - **Logprobs** — local drafts return `logprobs`; entropy/mean-logprob = self-confidence → serve-local vs. escalate.
+  - **Guided decoding** — xgrammar/outlines (`guided_json`/`guided_grammar`/`response_format`) for triage, judge, post-mortems, and the local tier's answers (pass-rate lift + injection guardrail).
+  - **Quantization as tiers** — INT4/AWQ (Marlin) + FP8 (Hopper/Ada) instances served as distinct routing rungs; policy routes over precision.
+  - **Prefix caching** (`--enable-prefix-caching`) — reuses the shared triage/RAG preamble KV across requests.
+  - **Speculative decoding** (draft/n-gram/EAGLE) — speeds the local draft-and-check path (distinct from §2's confidence gating).
+  - **Prometheus `/metrics`** — throughput, GPU util, TTFT, prefix-cache hit rate → the dashboard's GPU panel.
+  - Also serves the local answerer tier (**NVIDIA Nemotron**, via NIM/vLLM), routing-memory embeddings, LLM-judge, and risk-model inference — every request hits the GPU multiple times.
+  - `third_party/vllm` submodule is the reference tree for adapting these surfaces.
 - Baselines: always-{local,Haiku,Sonnet,Opus,Fable} run on the same suite for the Pareto comparison.
 - Learning: parametric per-tier pass-probability model (logistic / LinUCB) + Thompson-sampling bandit; credible-lower-bound gating; offline warm-start corpus.
 - Memory: SQLite + a vector index (policy observations + task-solution cache).
@@ -228,15 +337,20 @@ Front-load Phases 2, 3, and 6 — the measurable delta, the generalizing core, a
 - Security: HiddenLayer Runtime Security API (event code `AITX-2026`) + a separate risk model (source/pattern → attack-likelihood) driving pre-emptive hardening.
 - Dashboard: lightweight web UI (live SSE of decisions + findings + curves + a thumbs-up/down control).
 
+## Deferred
+
+- **Local tool-calling (vLLM `--enable-auto-tool-choice`).** Only compelling once sift routes *agentic, multi-step* tasks (routing per-step: cheap local model orchestrates tool calls, Claude handles the hard reasoning turns). The provider/harness interfaces are designed to accept it later; it's out of scope for the one-shot demo (widest scope, flakiest local surface). Revisit if the suite goes agentic.
+
 ## Status
 
-Initial harness scaffold started:
+Packaging fixed (hatchling wheel target → `sift`); current test suite passes locally. Initial harness scaffold:
 
-- `sift.providers` exposes an OpenAI-compatible provider interface.
+- `sift.providers` exposes an OpenAI-compatible provider interface, an Anthropic Messages adapter, response usage parsing, and a model price table for real token-cost telemetry.
 - Built-in provider presets currently cover GitHub Copilot models, Anthropic/Claude, OpenCode, vLLM, llmd-style local OpenAI-compatible endpoints, and Chinese model providers (DeepSeek, Qwen/DashScope, Moonshot/Kimi, Zhipu/GLM, Yi, Baichuan).
-- `sift.harness` can load task suites, send prompts through a provider, write the answer to a sandbox directory, and grade it with an executable shell check.
+- Claude defaults now target `claude-opus-4-6`; Anthropic request preparation omits `temperature` for Claude 4.6+ models.
+- `sift.harness` can load task suites, including train/held-out splits, send prompts through a provider, write the answer to a sandbox directory, and grade it with an executable shell check.
 - `sift.benchmarks` now runs always-model and static tag-routing baselines and summarizes pass rate plus observed token cost.
-- `tasks/dev_help_smoke.json` contains the first objective-check smoke task.
+- `tasks/dev_help_smoke.json` contains the first objective-check smoke task; `tasks/dev_help_archetypes.json` expands this into 30 coding-agent-style archetypes with train and held-out splits.
 - `third_party/vllm` tracks upstream vLLM as a git submodule so we can study and selectively adapt advanced serving/router/runtime concepts without vendoring a fork into Sift's source tree.
 
 Clone with submodules when you need the vLLM reference tree:
