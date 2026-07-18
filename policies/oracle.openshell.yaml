@@ -1,0 +1,71 @@
+# OpenShell policy for sift's executable oracle.
+#
+# The oracle runs a shell check against model-produced output — the one place
+# where model influence reaches a subprocess. This policy gives that execution
+# real capability (run the check, read/write its own scratch dir) while blocking
+# the lines it must never cross: exfiltration, credential access, escape.
+#
+# Pairs with HiddenLayer (detect at the model boundary) as defense-in-depth:
+# this is containment at the execution boundary. Even if a prompt injection slips
+# a malicious check_command past detection, the policy is what stops it.
+#
+# NOTE: validate key names against the OpenShell schema from the NemoClaw setup
+# guide at the venue; the intent below is the contract, syntax may need tuning.
+
+version: "1"
+name: sift-oracle
+description: Contain the executable oracle that grades untrusted model output.
+
+# --- Filesystem: confine to the task work dir; protect everything sensitive ---
+filesystem:
+  default: deny
+  allow:
+    # The oracle may read and write only inside its own task scratch directory.
+    - path: "${WORKDIR}"
+      access: [read, write, execute]
+    # Read-only access to standard toolchain for running checks.
+    - path: "/usr/bin"
+      access: [read, execute]
+    - path: "/usr/lib"
+      access: [read, execute]
+    - path: "/bin"
+      access: [read, execute]
+  deny:
+    # Credentials, keys, and history — never readable, even under injection.
+    - path: "${HOME}/.ssh"
+    - path: "${HOME}/.aws"
+    - path: "${HOME}/.config"
+    - path: "${HOME}/.netrc"
+    - path: "/etc/shadow"
+    - path: "/etc/passwd"
+    - path: "${HOME}/.env"
+    - path: "**/.git/config"
+
+# --- Network: deny-by-default egress (blocks "export the data" exfiltration) ---
+network:
+  default: deny
+  # No allowed hosts: the oracle is a local grader and needs zero egress.
+  # A poisoned check_command that curls secrets to an attacker endpoint is
+  # blocked here, at the boundary, not by the agent's goodwill.
+  allow: []
+
+# --- Processes: no privilege escalation, no reaching outside the sandbox ---
+process:
+  deny:
+    - sudo
+    - su
+    - ssh
+    - docker
+    - kubectl
+  # Irreversible / destructive actions require human approval rather than a
+  # blunt global block — a non-trivial boundary (allow-with-escalation).
+  escalate:
+    - action: "delete_outside_workdir"
+      approver: operator
+    - action: "spawn_daemon"
+      approver: operator
+
+limits:
+  wall_time_seconds: 30
+  max_processes: 32
+  max_output_bytes: 1048576

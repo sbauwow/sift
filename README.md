@@ -348,8 +348,8 @@ Packaging fixed (hatchling wheel target → `sift`); current test suite passes l
 - `sift.providers` exposes an OpenAI-compatible provider interface, an Anthropic Messages adapter, response usage parsing, and a model price table for real token-cost telemetry.
 - Built-in provider presets currently cover GitHub Copilot models, Anthropic/Claude, OpenCode, vLLM, llmd-style local OpenAI-compatible endpoints, and Chinese model providers (DeepSeek, Qwen/DashScope, Moonshot/Kimi, Zhipu/GLM, Yi, Baichuan).
 - Claude defaults now target `claude-opus-4-6`; Anthropic request preparation omits `temperature` for Claude 4.6+ models.
-- `sift.harness` can load task suites, including train/held-out splits, send prompts through a provider, write the answer to a sandbox directory, and grade it with an executable shell check.
-- `sift.benchmarks` now runs always-model and static tag-routing baselines and summarizes pass rate plus observed token cost.
+- `sift.harness` can load task suites, including train/held-out splits, send prompts through a provider, write the answer to a sandbox directory, grade it through an injectable sandbox, and record HiddenLayer screening event counts/latency.
+- `sift.benchmarks` now runs always-model and static tag-routing baselines and summarizes pass rate, observed token cost, and runtime-security overhead.
 - `sift.security` adds a HiddenLayer Runtime Security POC client with env-loaded credentials, signed event requests, prompt/response harness screening, and a runnable `scripts/hiddenlayer_poc.py` smoke check.
 - `tasks/dev_help_smoke.json` contains the first objective-check smoke task; `tasks/dev_help_archetypes.json` expands this into 30 coding-agent-style archetypes with train and held-out splits.
 - `third_party/vllm` tracks upstream vLLM as a git submodule so we can study and selectively adapt advanced serving/router/runtime concepts without vendoring a fork into Sift's source tree.

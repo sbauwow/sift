@@ -1,4 +1,4 @@
-from sift.benchmarks import run_always_model_baselines, run_static_routing_baseline, summarize_baselines
+from sift.benchmarks import BaselineResult, run_always_model_baselines, run_static_routing_baseline, summarize_baselines
 from sift.harness import TaskSpec
 from sift.providers import ChatMessage, ModelResponse, TokenUsage
 
@@ -34,8 +34,24 @@ def test_runs_always_model_baselines_and_summarizes_pass_rates(tmp_path):
     assert [run.provider for run in result.runs] == ["cheap", "expensive"]
     assert [run.evaluation.passed for run in result.runs] == [False, True]
     assert summarize_baselines(result) == {
-        "cheap": {"tasks": 1, "passed": 0, "pass_rate": 0.0, "cost_usd": 0.0},
-        "expensive": {"tasks": 1, "passed": 1, "pass_rate": 1.0, "cost_usd": 0.0},
+        "cheap": {
+            "tasks": 1,
+            "passed": 0,
+            "pass_rate": 0.0,
+            "cost_usd": 0.0,
+            "security_events": 0,
+            "security_latency_ms": 0.0,
+            "avg_security_latency_ms": 0.0,
+        },
+        "expensive": {
+            "tasks": 1,
+            "passed": 1,
+            "pass_rate": 1.0,
+            "cost_usd": 0.0,
+            "security_events": 0,
+            "security_latency_ms": 0.0,
+            "avg_security_latency_ms": 0.0,
+        },
     }
 
 
@@ -87,5 +103,47 @@ def test_baseline_summary_includes_observed_token_cost(tmp_path):
     result = run_always_model_baselines(tasks=[task], providers=[provider], work_dir=tmp_path)
 
     assert summarize_baselines(result) == {
-        "sonnet": {"tasks": 1, "passed": 1, "pass_rate": 1.0, "cost_usd": 0.033}
+        "sonnet": {
+            "tasks": 1,
+            "passed": 1,
+            "pass_rate": 1.0,
+            "cost_usd": 0.033,
+            "security_events": 0,
+            "security_latency_ms": 0.0,
+            "avg_security_latency_ms": 0.0,
+        }
     }
+
+
+def test_baseline_summary_includes_security_overhead():
+    from sift.harness import EvaluationResult, HarnessRun
+    from sift.security import SecurityVerdict
+
+    result = BaselineResult(
+        runs=[
+        HarnessRun(
+            task_id="t1",
+            provider="local",
+            model="m",
+            response="ok",
+            evaluation=EvaluationResult("t1", True, 0, "", ""),
+            security_verdict=SecurityVerdict(True, "ok"),
+            security_events=2,
+            security_latency_ms=11.25,
+        ),
+        HarnessRun(
+            task_id="t2",
+            provider="local",
+            model="m",
+            response="ok",
+            evaluation=EvaluationResult("t2", True, 0, "", ""),
+            security_verdict=SecurityVerdict(True, "ok"),
+            security_events=2,
+            security_latency_ms=8.75,
+        ),
+        ],
+    )
+
+    assert summarize_baselines(result)["local"]["security_events"] == 4
+    assert summarize_baselines(result)["local"]["security_latency_ms"] == 20.0
+    assert summarize_baselines(result)["local"]["avg_security_latency_ms"] == 10.0

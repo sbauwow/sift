@@ -201,18 +201,17 @@ _DEFAULT_MODELS = {
 
 
 _MODEL_PRICING = {
-    "gpt-5-mini": ModelPricing(
-        model="gpt-5-mini",
-        tier="value",
-        input_cost_per_million=0.25,
-        output_cost_per_million=2.0,
+    "gpt-5-mini": ModelPricing("gpt-5-mini", "value", 0.25, 2.0),
+    # Local Nemotron served on the NVIDIA GPU — no per-token cost.
+    "nvidia/Nemotron-Mini-4B-Instruct": ModelPricing(
+        "nvidia/Nemotron-Mini-4B-Instruct", "local", 0.0, 0.0
     ),
-    "claude-opus-4-6": ModelPricing(
-        model="claude-opus-4-6",
-        tier="frontier",
-        input_cost_per_million=5.0,
-        output_cost_per_million=25.0,
-    ),
+    # Claude ladder (current lineup, $/1M in/out).
+    "claude-haiku-4-5": ModelPricing("claude-haiku-4-5", "cheap", 1.0, 5.0),
+    "claude-sonnet-5": ModelPricing("claude-sonnet-5", "balanced", 3.0, 15.0),
+    "claude-opus-4-8": ModelPricing("claude-opus-4-8", "hard", 5.0, 25.0),
+    "claude-opus-4-6": ModelPricing("claude-opus-4-6", "hard", 5.0, 25.0),
+    "claude-fable-5": ModelPricing("claude-fable-5", "frontier", 10.0, 50.0),
 }
 
 
@@ -229,7 +228,9 @@ def model_pricing(model: str) -> ModelPricing:
 
 
 def _anthropic_model_drops_temperature(model: str) -> bool:
-    return "claude" in model and any(version in model for version in ("4-6", "4.6"))
+    # Sampling params are removed/deprecated on Claude 4.6+ and Fable — never send them.
+    modern = ("4-6", "4.6", "4-7", "4.7", "4-8", "4.8", "sonnet-5", "fable-5", "mythos-5")
+    return "claude" in model and any(version in model for version in modern)
 
 
 def _openai_compatible_usage(raw: dict[str, Any], model: str) -> TokenUsage | None:

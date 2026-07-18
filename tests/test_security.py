@@ -70,3 +70,21 @@ def test_harness_screens_model_response_before_evaluation(tmp_path):
         ("prompt", "say safe answer", {"task_id": "safe", "split": "train"}),
         ("response", "safe answer", {"task_id": "safe", "provider": "stub", "model": "stub-model"}),
     ]
+
+
+def test_harness_records_security_screening_overhead(tmp_path):
+    ticks = iter([1.00, 1.01, 2.00, 2.03])
+
+    def scanner(event_type, content, metadata):
+        return SecurityVerdict(allowed=True, reason="ok")
+
+    task = TaskSpec(id="safe", prompt="say safe answer", check_command="test \"$(cat answer.txt)\" = 'safe answer'")
+
+    run = Harness(
+        work_dir=tmp_path,
+        security_scanner=scanner,
+        clock=lambda: next(ticks),
+    ).run_task(task, StubProvider())
+
+    assert run.security_events == 2
+    assert run.security_latency_ms == 40.0

@@ -50,10 +50,20 @@ def summarize_baselines(result: BaselineResult) -> dict[str, dict[str, float | i
     for run in result.runs:
         provider_summary = summary.setdefault(
             run.provider,
-            {"tasks": 0, "passed": 0, "pass_rate": 0.0, "cost_usd": 0.0},
+            {
+                "tasks": 0,
+                "passed": 0,
+                "pass_rate": 0.0,
+                "cost_usd": 0.0,
+                "security_events": 0,
+                "security_latency_ms": 0.0,
+                "avg_security_latency_ms": 0.0,
+            },
         )
         provider_summary["tasks"] += 1
         provider_summary["cost_usd"] += run.cost_usd
+        provider_summary["security_events"] += run.security_events
+        provider_summary["security_latency_ms"] += run.security_latency_ms
         if run.evaluation.passed:
             provider_summary["passed"] += 1
 
@@ -61,6 +71,10 @@ def summarize_baselines(result: BaselineResult) -> dict[str, dict[str, float | i
         tasks = provider_summary["tasks"]
         provider_summary["pass_rate"] = provider_summary["passed"] / tasks if tasks else 0.0
         provider_summary["cost_usd"] = round(provider_summary["cost_usd"], 6)
+        provider_summary["security_latency_ms"] = round(provider_summary["security_latency_ms"], 6)
+        provider_summary["avg_security_latency_ms"] = (
+            round(provider_summary["security_latency_ms"] / tasks, 6) if tasks else 0.0
+        )
 
     return summary
 

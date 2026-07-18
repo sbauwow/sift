@@ -7,4 +7,7 @@ dist/
 build/
 *.egg-info/
 .harness-runs/
+_sift_state/
+_sift_poc/
+_sift_live/
 .env
