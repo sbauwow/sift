@@ -89,18 +89,89 @@ class OpenAICompatibleProvider:
         return ModelResponse(provider=self.name, model=self.model, content=content, raw=raw)
 
 
+class AnthropicProvider:
+    def __init__(
+        self,
+        *,
+        name: str,
+        model: str,
+        endpoint: str,
+        api_key: str | None = None,
+        transport: Transport | None = None,
+    ):
+        self.name = name
+        self.model = model
+        self.endpoint = endpoint
+        self.api_key = api_key
+        self._transport = transport or _urllib_transport
+
+    def prepare_chat_request(
+        self,
+        messages: list[ChatMessage],
+        *,
+        temperature: float | None = None,
+    ) -> PreparedRequest:
+        system_messages = [message.content for message in messages if message.role == "system"]
+        non_system_messages = [message.to_wire() for message in messages if message.role != "system"]
+        payload: dict[str, Any] = {
+            "model": self.model,
+            "max_tokens": 4096,
+            "messages": non_system_messages,
+        }
+        if system_messages:
+            payload["system"] = "\n\n".join(system_messages)
+        if temperature is not None:
+            payload["temperature"] = temperature
+
+        headers = {
+            "Content-Type": "application/json",
+            "anthropic-version": "2023-06-01",
+        }
+        if self.api_key:
+            headers["x-api-key"] = self.api_key
+
+        return PreparedRequest(url=self.endpoint, headers=headers, json=payload)
+
+    def generate(
+        self,
+        messages: list[ChatMessage],
+        *,
+        temperature: float | None = None,
+    ) -> ModelResponse:
+        request = self.prepare_chat_request(messages, temperature=temperature)
+        raw = self._transport(request)
+        content = raw["content"][0]["text"]
+        return ModelResponse(provider=self.name, model=self.model, content=content, raw=raw)
+
+
 _DEFAULT_ENDPOINTS = {
+    "anthropic": "https://api.anthropic.com/v1/messages",
+    "claude": "https://api.anthropic.com/v1/messages",
     "copilot": "https://api.githubcopilot.com/chat/completions",
+    "deepseek": "https://api.deepseek.com/chat/completions",
     "opencode": "http://localhost:4096/v1/chat/completions",
     "vllm": "http://localhost:8000/v1/chat/completions",
     "llmd": "http://localhost:8080/v1/chat/completions",
+    "qwen": "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions",
+    "moonshot": "https://api.moonshot.cn/v1/chat/completions",
+    "zhipu": "https://open.bigmodel.cn/api/paas/v4/chat/completions",
+    "yi": "https://api.lingyiwanwu.com/v1/chat/completions",
+    "baichuan": "https://api.baichuan-ai.com/v1/chat/completions",
 }
 
 _DEFAULT_MODELS = {
+    "anthropic": "claude-sonnet-4-5",
+    "claude": "claude-sonnet-4-5",
     "copilot": "gpt-5-mini",
+    "deepseek": "deepseek-chat",
     "opencode": "qwen2.5-coder",
     "vllm": "Qwen/Qwen2.5-Coder-7B-Instruct",
     "llmd": "Qwen/Qwen2.5-Coder-7B-Instruct",
+    "qwen": "qwen-plus",
+    "moonshot": "moonshot-v1-8k",
+    "zhipu": "glm-4.5",
+    "yi": "yi-large",
+    "baichuan": "Baichuan4",
 }
 
 
@@ -123,7 +194,15 @@ def build_provider(
     config: ProviderConfig,
     *,
     transport: Transport | None = None,
-) -> OpenAICompatibleProvider:
+) -> OpenAICompatibleProvider | AnthropicProvider:
+    if config.name in {"anthropic", "claude"}:
+        return AnthropicProvider(
+            name=config.name,
+            model=config.model,
+            endpoint=config.endpoint,
+            api_key=config.api_key,
+            transport=transport,
+        )
     return OpenAICompatibleProvider(
         name=config.name,
         model=config.model,

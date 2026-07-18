@@ -48,6 +48,53 @@ def test_provider_config_has_builtin_presets_for_supported_backends():
     assert provider_config("opencode", model="qwen", api_key="x").endpoint == "http://localhost:4096/v1/chat/completions"
 
 
+def test_provider_config_has_anthropic_claude_preset():
+    config = provider_config("anthropic", api_key="x")
+
+    assert config.model == "claude-sonnet-4-5"
+    assert config.endpoint == "https://api.anthropic.com/v1/messages"
+
+
+def test_anthropic_provider_prepares_messages_request():
+    provider = build_provider(provider_config("claude", api_key="anthropic-key"))
+
+    request = provider.prepare_chat_request(
+        [
+            ChatMessage(role="system", content="Be terse."),
+            ChatMessage(role="user", content="write a regex for hex colors"),
+        ],
+        temperature=0.2,
+    )
+
+    assert request.url == "https://api.anthropic.com/v1/messages"
+    assert request.headers["x-api-key"] == "anthropic-key"
+    assert request.headers["anthropic-version"] == "2023-06-01"
+    assert "Authorization" not in request.headers
+    assert request.json == {
+        "model": "claude-sonnet-4-5",
+        "max_tokens": 4096,
+        "system": "Be terse.",
+        "messages": [{"role": "user", "content": "write a regex for hex colors"}],
+        "temperature": 0.2,
+    }
+
+
+def test_provider_config_has_chinese_provider_presets():
+    expected = {
+        "deepseek": ("deepseek-chat", "https://api.deepseek.com/chat/completions"),
+        "qwen": ("qwen-plus", "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions"),
+        "moonshot": ("moonshot-v1-8k", "https://api.moonshot.cn/v1/chat/completions"),
+        "zhipu": ("glm-4.5", "https://open.bigmodel.cn/api/paas/v4/chat/completions"),
+        "yi": ("yi-large", "https://api.lingyiwanwu.com/v1/chat/completions"),
+        "baichuan": ("Baichuan4", "https://api.baichuan-ai.com/v1/chat/completions"),
+    }
+
+    for provider_name, (model, endpoint) in expected.items():
+        config = provider_config(provider_name, api_key="x")
+        assert config.model == model
+        assert config.endpoint == endpoint
+
+
 def test_provider_generates_text_through_injected_transport():
     calls = []
 
