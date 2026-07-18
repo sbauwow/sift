@@ -235,6 +235,7 @@ Initial harness scaffold started:
 - `sift.providers` exposes an OpenAI-compatible provider interface.
 - Built-in provider presets currently cover GitHub Copilot models, Anthropic/Claude, OpenCode, vLLM, llmd-style local OpenAI-compatible endpoints, and Chinese model providers (DeepSeek, Qwen/DashScope, Moonshot/Kimi, Zhipu/GLM, Yi, Baichuan).
 - `sift.harness` can load task suites, send prompts through a provider, write the answer to a sandbox directory, and grade it with an executable shell check.
+- `sift.benchmarks` now runs always-model and static tag-routing baselines and summarizes pass rate plus observed token cost.
 - `tasks/dev_help_smoke.json` contains the first objective-check smoke task.
 - `third_party/vllm` tracks upstream vLLM as a git submodule so we can study and selectively adapt advanced serving/router/runtime concepts without vendoring a fork into Sift's source tree.
 

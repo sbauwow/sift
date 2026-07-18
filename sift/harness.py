@@ -40,6 +40,7 @@ class HarnessRun:
     model: str
     response: str
     evaluation: EvaluationResult
+    cost_usd: float = 0.0
 
 
 class Harness:
@@ -56,6 +57,7 @@ class Harness:
             model=model_response.model,
             response=model_response.content,
             evaluation=evaluation,
+            cost_usd=model_response.usage.cost_usd if model_response.usage else 0.0,
         )
 
     def evaluate(self, task: TaskSpec, answer: str) -> EvaluationResult:

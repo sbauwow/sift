@@ -35,11 +35,26 @@ class PreparedRequest:
 
 
 @dataclass(frozen=True)
+class TokenUsage:
+    input_tokens: int
+    output_tokens: int
+    input_cost_per_million: float = 0.0
+    output_cost_per_million: float = 0.0
+
+    @property
+    def cost_usd(self) -> float:
+        input_cost = self.input_tokens * self.input_cost_per_million / 1_000_000
+        output_cost = self.output_tokens * self.output_cost_per_million / 1_000_000
+        return input_cost + output_cost
+
+
+@dataclass(frozen=True)
 class ModelResponse:
     provider: str
     model: str
     content: str
     raw: dict[str, Any]
+    usage: TokenUsage | None = None
 
 
 class OpenAICompatibleProvider:
