@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Protocol
 
 from sift.providers import ChatMessage, ModelResponse
+from sift.security import SecurityVerdict
 
 
 class Provider(Protocol):
@@ -14,6 +15,10 @@ class Provider(Protocol):
     model: str
 
     def generate(self, messages: list[ChatMessage]) -> ModelResponse: ...
+
+
+class SecurityScanner(Protocol):
+    def __call__(self, event_type: str, content: str, metadata: dict[str, str]) -> SecurityVerdict: ...
 
 
 @dataclass(frozen=True)
@@ -42,15 +47,56 @@ class HarnessRun:
     response: str
     evaluation: EvaluationResult
     cost_usd: float = 0.0
+    security_verdict: SecurityVerdict = SecurityVerdict(allowed=True, reason="not scanned")
 
 
 class Harness:
-    def __init__(self, work_dir: str | Path):
+    def __init__(self, work_dir: str | Path, security_scanner: SecurityScanner | None = None):
         self.work_dir = Path(work_dir)
         self.work_dir.mkdir(parents=True, exist_ok=True)
+        self.security_scanner = security_scanner
 
     def run_task(self, task: TaskSpec, provider: Provider) -> HarnessRun:
+        prompt_verdict = self._scan("prompt", task.prompt, {"task_id": task.id, "split": task.split})
+        if not prompt_verdict.allowed:
+            return HarnessRun(
+                task_id=task.id,
+                provider=provider.name,
+                model=provider.model,
+                response="",
+                evaluation=EvaluationResult(
+                    task_id=task.id,
+                    passed=False,
+                    exit_code=1,
+                    stdout="",
+                    stderr=prompt_verdict.reason,
+                ),
+                security_verdict=prompt_verdict,
+            )
+
         model_response = provider.generate([ChatMessage(role="user", content=task.prompt)])
+        response_verdict = self._scan(
+            "response",
+            model_response.content,
+            {"task_id": task.id, "provider": model_response.provider, "model": model_response.model},
+        )
+        if not response_verdict.allowed:
+            return HarnessRun(
+                task_id=task.id,
+                provider=model_response.provider,
+                model=model_response.model,
+                response=model_response.content,
+                evaluation=EvaluationResult(
+                    task_id=task.id,
+                    passed=False,
+                    exit_code=1,
+                    stdout="",
+                    stderr=response_verdict.reason,
+                ),
+                cost_usd=model_response.usage.cost_usd if model_response.usage else 0.0,
+                security_verdict=response_verdict,
+            )
+
         evaluation = self.evaluate(task, model_response.content)
         return HarnessRun(
             task_id=task.id,
@@ -59,6 +105,7 @@ class Harness:
             response=model_response.content,
             evaluation=evaluation,
             cost_usd=model_response.usage.cost_usd if model_response.usage else 0.0,
+            security_verdict=response_verdict,
         )
 
     def evaluate(self, task: TaskSpec, answer: str) -> EvaluationResult:
@@ -82,6 +129,11 @@ class Harness:
             stdout=completed.stdout,
             stderr=completed.stderr,
         )
+
+    def _scan(self, event_type: str, content: str, metadata: dict[str, str]) -> SecurityVerdict:
+        if self.security_scanner is None:
+            return SecurityVerdict(allowed=True, reason="not scanned")
+        return self.security_scanner(event_type, content, metadata)
 
 
 def load_tasks(path: str | Path) -> list[TaskSpec]:
