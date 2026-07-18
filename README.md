@@ -230,7 +230,14 @@ Front-load Phases 2, 3, and 6 — the measurable delta, the generalizing core, a
 
 ## Status
 
-Plan stage. No code yet.
+Initial harness scaffold started:
+
+- `sift.providers` exposes an OpenAI-compatible provider interface.
+- Built-in provider presets currently cover GitHub Copilot models, OpenCode, vLLM, and llmd-style local OpenAI-compatible endpoints.
+- `sift.harness` can load task suites, send prompts through a provider, write the answer to a sandbox directory, and grade it with an executable shell check.
+- `tasks/dev_help_smoke.json` contains the first objective-check smoke task.
+
+The first implementation target is still the measurement harness: prove Sift beats static routing and always-model baselines before building the full adaptive router.
 
 ## Hackathon
 
