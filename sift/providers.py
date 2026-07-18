@@ -49,6 +49,14 @@ class TokenUsage:
 
 
 @dataclass(frozen=True)
+class ModelPricing:
+    model: str
+    tier: str
+    input_cost_per_million: float
+    output_cost_per_million: float
+
+
+@dataclass(frozen=True)
 class ModelResponse:
     provider: str
     model: str
@@ -101,7 +109,8 @@ class OpenAICompatibleProvider:
         request = self.prepare_chat_request(messages, temperature=temperature)
         raw = self._transport(request)
         content = raw["choices"][0]["message"]["content"]
-        return ModelResponse(provider=self.name, model=self.model, content=content, raw=raw)
+        usage = _openai_compatible_usage(raw, self.model)
+        return ModelResponse(provider=self.name, model=self.model, content=content, raw=raw, usage=usage)
 
 
 class AnthropicProvider:
@@ -135,7 +144,7 @@ class AnthropicProvider:
         }
         if system_messages:
             payload["system"] = "\n\n".join(system_messages)
-        if temperature is not None:
+        if temperature is not None and not _anthropic_model_drops_temperature(self.model):
             payload["temperature"] = temperature
 
         headers = {
@@ -156,7 +165,8 @@ class AnthropicProvider:
         request = self.prepare_chat_request(messages, temperature=temperature)
         raw = self._transport(request)
         content = raw["content"][0]["text"]
-        return ModelResponse(provider=self.name, model=self.model, content=content, raw=raw)
+        usage = _anthropic_usage(raw, self.model)
+        return ModelResponse(provider=self.name, model=self.model, content=content, raw=raw, usage=usage)
 
 
 _DEFAULT_ENDPOINTS = {
@@ -175,8 +185,8 @@ _DEFAULT_ENDPOINTS = {
 }
 
 _DEFAULT_MODELS = {
-    "anthropic": "claude-sonnet-4-5",
-    "claude": "claude-sonnet-4-5",
+    "anthropic": "claude-sonnet-4-6",
+    "claude": "claude-sonnet-4-6",
     "copilot": "gpt-5-mini",
     "deepseek": "deepseek-chat",
     "opencode": "qwen2.5-coder",
@@ -188,6 +198,64 @@ _DEFAULT_MODELS = {
     "yi": "yi-large",
     "baichuan": "Baichuan4",
 }
+
+
+_MODEL_PRICING = {
+    "gpt-5-mini": ModelPricing(
+        model="gpt-5-mini",
+        tier="value",
+        input_cost_per_million=0.25,
+        output_cost_per_million=2.0,
+    ),
+    "claude-sonnet-4-6": ModelPricing(
+        model="claude-sonnet-4-6",
+        tier="frontier",
+        input_cost_per_million=3.0,
+        output_cost_per_million=15.0,
+    ),
+}
+
+
+_ZERO_COST_PRICING = ModelPricing(
+    model="unknown",
+    tier="unknown",
+    input_cost_per_million=0.0,
+    output_cost_per_million=0.0,
+)
+
+
+def model_pricing(model: str) -> ModelPricing:
+    return _MODEL_PRICING.get(model, _ZERO_COST_PRICING)
+
+
+def _anthropic_model_drops_temperature(model: str) -> bool:
+    return "claude" in model and any(version in model for version in ("4-6", "4.6"))
+
+
+def _openai_compatible_usage(raw: dict[str, Any], model: str) -> TokenUsage | None:
+    raw_usage = raw.get("usage")
+    if not raw_usage:
+        return None
+    pricing = model_pricing(model)
+    return TokenUsage(
+        input_tokens=raw_usage.get("prompt_tokens", 0),
+        output_tokens=raw_usage.get("completion_tokens", 0),
+        input_cost_per_million=pricing.input_cost_per_million,
+        output_cost_per_million=pricing.output_cost_per_million,
+    )
+
+
+def _anthropic_usage(raw: dict[str, Any], model: str) -> TokenUsage | None:
+    raw_usage = raw.get("usage")
+    if not raw_usage:
+        return None
+    pricing = model_pricing(model)
+    return TokenUsage(
+        input_tokens=raw_usage.get("input_tokens", 0),
+        output_tokens=raw_usage.get("output_tokens", 0),
+        input_cost_per_million=pricing.input_cost_per_million,
+        output_cost_per_million=pricing.output_cost_per_million,
+    )
 
 
 def provider_config(

@@ -52,6 +52,7 @@ def test_loads_task_suite_from_json_file(tmp_path):
                     "prompt": "write a regex that matches hex colors",
                     "check_command": "test -s answer.txt",
                     "tags": ["regex", "easy"],
+                    "split": "train",
                 }
             ]
         ),
@@ -66,5 +67,6 @@ def test_loads_task_suite_from_json_file(tmp_path):
             prompt="write a regex that matches hex colors",
             check_command="test -s answer.txt",
             tags=("regex", "easy"),
+            split="train",
         )
     ]

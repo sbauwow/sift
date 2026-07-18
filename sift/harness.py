@@ -22,6 +22,7 @@ class TaskSpec:
     prompt: str
     check_command: str
     tags: tuple[str, ...] = ()
+    split: str = "train"
 
 
 @dataclass(frozen=True)
@@ -91,6 +92,7 @@ def load_tasks(path: str | Path) -> list[TaskSpec]:
             prompt=raw["prompt"],
             check_command=raw["check_command"],
             tags=tuple(raw.get("tags", ())),
+            split=raw.get("split", "train"),
         )
         for raw in raw_tasks
     ]

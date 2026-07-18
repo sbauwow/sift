@@ -1,0 +1,392 @@
+[
+  {
+    "id": "regex-uuid-v4",
+    "prompt": "Return a regex that matches a lowercase UUID v4 string. Return only the final answer, with no markdown or explanation.",
+    "check_command": "python -c \"from pathlib import Path\\nexpected = '^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'\\nactual = Path('answer.txt').read_text(encoding='utf-8').strip()\\nassert actual == expected, (actual, expected)\\n\"",
+    "tags": [
+      "coding",
+      "regex",
+      "validation",
+      "easy",
+      "objective-check"
+    ],
+    "split": "train"
+  },
+  {
+    "id": "regex-slug",
+    "prompt": "Return a regex that matches a lowercase URL slug made of letters, numbers, and single hyphens between words. Return only the final answer, with no markdown or explanation.",
+    "check_command": "python -c \"from pathlib import Path\\nexpected = '^[a-z0-9]+(?:-[a-z0-9]+)*$'\\nactual = Path('answer.txt').read_text(encoding='utf-8').strip()\\nassert actual == expected, (actual, expected)\\n\"",
+    "tags": [
+      "coding",
+      "regex",
+      "validation",
+      "easy",
+      "objective-check"
+    ],
+    "split": "train"
+  },
+  {
+    "id": "regex-iso-date",
+    "prompt": "Return a regex that matches an ISO date in YYYY-MM-DD form. Return only the final answer, with no markdown or explanation.",
+    "check_command": "python -c \"from pathlib import Path\\nexpected = '^\\\\\\\\d{4}-\\\\\\\\d{2}-\\\\\\\\d{2}$'\\nactual = Path('answer.txt').read_text(encoding='utf-8').strip()\\nassert actual == expected, (actual, expected)\\n\"",
+    "tags": [
+      "coding",
+      "regex",
+      "date",
+      "easy",
+      "objective-check"
+    ],
+    "split": "train"
+  },
+  {
+    "id": "sql-users-active",
+    "prompt": "Return SQL selecting id and email from users where active is true. Return only the final answer, with no markdown or explanation.",
+    "check_command": "python -c \"from pathlib import Path\\nexpected = 'SELECT id, email FROM users WHERE active = TRUE;'\\nactual = Path('answer.txt').read_text(encoding='utf-8').strip()\\nassert actual == expected, (actual, expected)\\n\"",
+    "tags": [
+      "coding",
+      "sql",
+      "query",
+      "easy",
+      "objective-check"
+    ],
+    "split": "train"
+  },
+  {
+    "id": "sql-count-orders",
+    "prompt": "Return SQL counting orders per user_id from orders grouped by user_id. Return only the final answer, with no markdown or explanation.",
+    "check_command": "python -c \"from pathlib import Path\\nexpected = 'SELECT user_id, COUNT(*) AS order_count FROM orders GROUP BY user_id;'\\nactual = Path('answer.txt').read_text(encoding='utf-8').strip()\\nassert actual == expected, (actual, expected)\\n\"",
+    "tags": [
+      "coding",
+      "sql",
+      "aggregation",
+      "easy",
+      "objective-check"
+    ],
+    "split": "train"
+  },
+  {
+    "id": "sql-left-join",
+    "prompt": "Return SQL selecting users.email and profiles.display_name using a left join on profiles.user_id = users.id. Return only the final answer, with no markdown or explanation.",
+    "check_command": "python -c \"from pathlib import Path\\nexpected = 'SELECT users.email, profiles.display_name FROM users LEFT JOIN profiles ON profiles.user_id = users.id;'\\nactual = Path('answer.txt').read_text(encoding='utf-8').strip()\\nassert actual == expected, (actual, expected)\\n\"",
+    "tags": [
+      "coding",
+      "sql",
+      "join",
+      "medium",
+      "objective-check"
+    ],
+    "split": "train"
+  },
+  {
+    "id": "python-factorial",
+    "prompt": "Return a Python function definition for factorial(n) using recursion. Return only the final answer, with no markdown or explanation.",
+    "check_command": "python -c \"from pathlib import Path\\nexpected = 'def factorial(n):\\\\n    return 1 if n <= 1 else n * factorial(n - 1)'\\nactual = Path('answer.txt').read_text(encoding='utf-8').strip()\\nassert actual == expected, (actual, expected)\\n\"",
+    "tags": [
+      "coding",
+      "python",
+      "function",
+      "easy",
+      "objective-check"
+    ],
+    "split": "train"
+  },
+  {
+    "id": "python-list-evens",
+    "prompt": "Return a Python expression that filters nums to even values. Return only the final answer, with no markdown or explanation.",
+    "check_command": "python -c \"from pathlib import Path\\nexpected = '[n for n in nums if n % 2 == 0]'\\nactual = Path('answer.txt').read_text(encoding='utf-8').strip()\\nassert actual == expected, (actual, expected)\\n\"",
+    "tags": [
+      "coding",
+      "python",
+      "list-comprehension",
+      "easy",
+      "objective-check"
+    ],
+    "split": "train"
+  },
+  {
+    "id": "python-dict-get",
+    "prompt": "Return a Python expression that reads key 'name' from dict user with default 'anonymous'. Return only the final answer, with no markdown or explanation.",
+    "check_command": "python -c 'from pathlib import Path\\nexpected = \"user.get(\\'name\\', \\'anonymous\\')\"\\nactual = Path(\\'answer.txt\\').read_text(encoding=\\'utf-8\\').strip()\\nassert actual == expected, (actual, expected)\\n'",
+    "tags": [
+      "coding",
+      "python",
+      "dict",
+      "easy",
+      "objective-check"
+    ],
+    "split": "train"
+  },
+  {
+    "id": "bash-find-py",
+    "prompt": "Return a shell command that finds Python files under the current directory. Return only the final answer, with no markdown or explanation.",
+    "check_command": "python -c 'from pathlib import Path\\nexpected = \"find . -name \\'*.py\\'\"\\nactual = Path(\\'answer.txt\\').read_text(encoding=\\'utf-8\\').strip()\\nassert actual == expected, (actual, expected)\\n'",
+    "tags": [
+      "coding",
+      "shell",
+      "filesystem",
+      "easy",
+      "objective-check"
+    ],
+    "split": "train"
+  },
+  {
+    "id": "bash-grep-error",
+    "prompt": "Return a shell command that recursively searches for ERROR in log files. Return only the final answer, with no markdown or explanation.",
+    "check_command": "python -c \"from pathlib import Path\\nexpected = 'grep -R ERROR -- *.log'\\nactual = Path('answer.txt').read_text(encoding='utf-8').strip()\\nassert actual == expected, (actual, expected)\\n\"",
+    "tags": [
+      "coding",
+      "shell",
+      "logs",
+      "easy",
+      "objective-check"
+    ],
+    "split": "train"
+  },
+  {
+    "id": "bash-tar-gz",
+    "prompt": "Return a shell command that creates app.tar.gz from the app directory. Return only the final answer, with no markdown or explanation.",
+    "check_command": "python -c \"from pathlib import Path\\nexpected = 'tar -czf app.tar.gz app'\\nactual = Path('answer.txt').read_text(encoding='utf-8').strip()\\nassert actual == expected, (actual, expected)\\n\"",
+    "tags": [
+      "coding",
+      "shell",
+      "archive",
+      "easy",
+      "objective-check"
+    ],
+    "split": "train"
+  },
+  {
+    "id": "json-user",
+    "prompt": "Return minified JSON for a user with id 7 and name Ada. Return only the final answer, with no markdown or explanation.",
+    "check_command": "python -c 'from pathlib import Path\\nexpected = \\'{\"id\":7,\"name\":\"Ada\"}\\'\\nactual = Path(\\'answer.txt\\').read_text(encoding=\\'utf-8\\').strip()\\nassert actual == expected, (actual, expected)\\n'",
+    "tags": [
+      "coding",
+      "json",
+      "serialization",
+      "easy",
+      "objective-check"
+    ],
+    "split": "train"
+  },
+  {
+    "id": "yaml-service-port",
+    "prompt": "Return YAML defining service api with port 8080. Return only the final answer, with no markdown or explanation.",
+    "check_command": "python -c \"from pathlib import Path\\nexpected = 'service:\\\\n  name: api\\\\n  port: 8080'\\nactual = Path('answer.txt').read_text(encoding='utf-8').strip()\\nassert actual == expected, (actual, expected)\\n\"",
+    "tags": [
+      "coding",
+      "yaml",
+      "config",
+      "easy",
+      "objective-check"
+    ],
+    "split": "train"
+  },
+  {
+    "id": "cron-nightly",
+    "prompt": "Return a cron expression for 02:30 every day. Return only the final answer, with no markdown or explanation.",
+    "check_command": "python -c \"from pathlib import Path\\nexpected = '30 2 * * *'\\nactual = Path('answer.txt').read_text(encoding='utf-8').strip()\\nassert actual == expected, (actual, expected)\\n\"",
+    "tags": [
+      "coding",
+      "cron",
+      "scheduling",
+      "easy",
+      "objective-check"
+    ],
+    "split": "train"
+  },
+  {
+    "id": "semver-major",
+    "prompt": "Given semver 2.9.4, return the next major version. Return only the final answer, with no markdown or explanation.",
+    "check_command": "python -c \"from pathlib import Path\\nexpected = '3.0.0'\\nactual = Path('answer.txt').read_text(encoding='utf-8').strip()\\nassert actual == expected, (actual, expected)\\n\"",
+    "tags": [
+      "coding",
+      "semver",
+      "versioning",
+      "easy",
+      "objective-check"
+    ],
+    "split": "train"
+  },
+  {
+    "id": "http-created",
+    "prompt": "Return the HTTP status code for Created. Return only the final answer, with no markdown or explanation.",
+    "check_command": "python -c \"from pathlib import Path\\nexpected = '201'\\nactual = Path('answer.txt').read_text(encoding='utf-8').strip()\\nassert actual == expected, (actual, expected)\\n\"",
+    "tags": [
+      "coding",
+      "http",
+      "api",
+      "easy",
+      "objective-check"
+    ],
+    "split": "train"
+  },
+  {
+    "id": "html-link",
+    "prompt": "Return an HTML link to /docs with text Docs. Return only the final answer, with no markdown or explanation.",
+    "check_command": "python -c 'from pathlib import Path\\nexpected = \\'<a href=\"/docs\">Docs</a>\\'\\nactual = Path(\\'answer.txt\\').read_text(encoding=\\'utf-8\\').strip()\\nassert actual == expected, (actual, expected)\\n'",
+    "tags": [
+      "coding",
+      "html",
+      "frontend",
+      "easy",
+      "objective-check"
+    ],
+    "split": "train"
+  },
+  {
+    "id": "css-hidden",
+    "prompt": "Return CSS that visually hides elements with class sr-only while keeping them accessible. Return only the final answer, with no markdown or explanation.",
+    "check_command": "python -c \"from pathlib import Path\\nexpected = '.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); }'\\nactual = Path('answer.txt').read_text(encoding='utf-8').strip()\\nassert actual == expected, (actual, expected)\\n\"",
+    "tags": [
+      "coding",
+      "css",
+      "accessibility",
+      "medium",
+      "objective-check"
+    ],
+    "split": "train"
+  },
+  {
+    "id": "jq-user-email",
+    "prompt": "Return a jq filter that extracts .user.email. Return only the final answer, with no markdown or explanation.",
+    "check_command": "python -c \"from pathlib import Path\\nexpected = '.user.email'\\nactual = Path('answer.txt').read_text(encoding='utf-8').strip()\\nassert actual == expected, (actual, expected)\\n\"",
+    "tags": [
+      "coding",
+      "jq",
+      "json",
+      "easy",
+      "objective-check"
+    ],
+    "split": "train"
+  },
+  {
+    "id": "git-branch",
+    "prompt": "Return a git command that creates and switches to branch feature/sift. Return only the final answer, with no markdown or explanation.",
+    "check_command": "python -c \"from pathlib import Path\\nexpected = 'git switch -c feature/sift'\\nactual = Path('answer.txt').read_text(encoding='utf-8').strip()\\nassert actual == expected, (actual, expected)\\n\"",
+    "tags": [
+      "coding",
+      "git",
+      "workflow",
+      "easy",
+      "objective-check"
+    ],
+    "split": "train"
+  },
+  {
+    "id": "docker-build",
+    "prompt": "Return a Docker command that builds image sift:latest from the current directory. Return only the final answer, with no markdown or explanation.",
+    "check_command": "python -c \"from pathlib import Path\\nexpected = 'docker build -t sift:latest .'\\nactual = Path('answer.txt').read_text(encoding='utf-8').strip()\\nassert actual == expected, (actual, expected)\\n\"",
+    "tags": [
+      "coding",
+      "docker",
+      "devops",
+      "easy",
+      "objective-check"
+    ],
+    "split": "train"
+  },
+  {
+    "id": "regex-ipv4",
+    "prompt": "Return a regex that matches a simple dotted IPv4 address with 1-3 digits per octet. Return only the final answer, with no markdown or explanation.",
+    "check_command": "python -c \"from pathlib import Path\\nexpected = '^\\\\\\\\d{1,3}(?:\\\\\\\\.\\\\\\\\d{1,3}){3}$'\\nactual = Path('answer.txt').read_text(encoding='utf-8').strip()\\nassert actual == expected, (actual, expected)\\n\"",
+    "tags": [
+      "coding",
+      "regex",
+      "validation",
+      "heldout",
+      "objective-check"
+    ],
+    "split": "heldout"
+  },
+  {
+    "id": "sql-recent-events",
+    "prompt": "Return SQL selecting all columns from events where created_at is on or after 2026-01-01. Return only the final answer, with no markdown or explanation.",
+    "check_command": "python -c 'from pathlib import Path\\nexpected = \"SELECT * FROM events WHERE created_at >= \\'2026-01-01\\';\"\\nactual = Path(\\'answer.txt\\').read_text(encoding=\\'utf-8\\').strip()\\nassert actual == expected, (actual, expected)\\n'",
+    "tags": [
+      "coding",
+      "sql",
+      "date",
+      "heldout",
+      "objective-check"
+    ],
+    "split": "heldout"
+  },
+  {
+    "id": "python-safe-divide",
+    "prompt": "Return a Python function definition safe_divide(a, b) that returns None on divide by zero. Return only the final answer, with no markdown or explanation.",
+    "check_command": "python -c \"from pathlib import Path\\nexpected = 'def safe_divide(a, b):\\\\n    return None if b == 0 else a / b'\\nactual = Path('answer.txt').read_text(encoding='utf-8').strip()\\nassert actual == expected, (actual, expected)\\n\"",
+    "tags": [
+      "coding",
+      "python",
+      "function",
+      "heldout",
+      "objective-check"
+    ],
+    "split": "heldout"
+  },
+  {
+    "id": "bash-count-lines",
+    "prompt": "Return a shell command that counts lines in README.md. Return only the final answer, with no markdown or explanation.",
+    "check_command": "python -c \"from pathlib import Path\\nexpected = 'wc -l README.md'\\nactual = Path('answer.txt').read_text(encoding='utf-8').strip()\\nassert actual == expected, (actual, expected)\\n\"",
+    "tags": [
+      "coding",
+      "shell",
+      "filesystem",
+      "heldout",
+      "objective-check"
+    ],
+    "split": "heldout"
+  },
+  {
+    "id": "json-feature-flag",
+    "prompt": "Return minified JSON for feature flag sift_enabled set to true. Return only the final answer, with no markdown or explanation.",
+    "check_command": "python -c 'from pathlib import Path\\nexpected = \\'{\"sift_enabled\":true}\\'\\nactual = Path(\\'answer.txt\\').read_text(encoding=\\'utf-8\\').strip()\\nassert actual == expected, (actual, expected)\\n'",
+    "tags": [
+      "coding",
+      "json",
+      "config",
+      "heldout",
+      "objective-check"
+    ],
+    "split": "heldout"
+  },
+  {
+    "id": "yaml-timeout",
+    "prompt": "Return YAML setting timeout_seconds to 30. Return only the final answer, with no markdown or explanation.",
+    "check_command": "python -c \"from pathlib import Path\\nexpected = 'timeout_seconds: 30'\\nactual = Path('answer.txt').read_text(encoding='utf-8').strip()\\nassert actual == expected, (actual, expected)\\n\"",
+    "tags": [
+      "coding",
+      "yaml",
+      "config",
+      "heldout",
+      "objective-check"
+    ],
+    "split": "heldout"
+  },
+  {
+    "id": "cron-weekly",
+    "prompt": "Return a cron expression for 09:00 every Monday. Return only the final answer, with no markdown or explanation.",
+    "check_command": "python -c \"from pathlib import Path\\nexpected = '0 9 * * 1'\\nactual = Path('answer.txt').read_text(encoding='utf-8').strip()\\nassert actual == expected, (actual, expected)\\n\"",
+    "tags": [
+      "coding",
+      "cron",
+      "scheduling",
+      "heldout",
+      "objective-check"
+    ],
+    "split": "heldout"
+  },
+  {
+    "id": "http-not-found",
+    "prompt": "Return the HTTP status code for Not Found. Return only the final answer, with no markdown or explanation.",
+    "check_command": "python -c \"from pathlib import Path\\nexpected = '404'\\nactual = Path('answer.txt').read_text(encoding='utf-8').strip()\\nassert actual == expected, (actual, expected)\\n\"",
+    "tags": [
+      "coding",
+      "http",
+      "api",
+      "heldout",
+      "objective-check"
+    ],
+    "split": "heldout"
+  }
+]
