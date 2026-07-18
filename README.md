@@ -236,6 +236,15 @@ Initial harness scaffold started:
 - Built-in provider presets currently cover GitHub Copilot models, Anthropic/Claude, OpenCode, vLLM, llmd-style local OpenAI-compatible endpoints, and Chinese model providers (DeepSeek, Qwen/DashScope, Moonshot/Kimi, Zhipu/GLM, Yi, Baichuan).
 - `sift.harness` can load task suites, send prompts through a provider, write the answer to a sandbox directory, and grade it with an executable shell check.
 - `tasks/dev_help_smoke.json` contains the first objective-check smoke task.
+- `third_party/vllm` tracks upstream vLLM as a git submodule so we can study and selectively adapt advanced serving/router/runtime concepts without vendoring a fork into Sift's source tree.
+
+Clone with submodules when you need the vLLM reference tree:
+
+```bash
+git clone --recurse-submodules https://github.com/sbauwow/sift.git
+# or, in an existing checkout:
+git submodule update --init --recursive
+```
 
 The first implementation target is still the measurement harness: prove Sift beats static routing and always-model baselines before building the full adaptive router.
 
